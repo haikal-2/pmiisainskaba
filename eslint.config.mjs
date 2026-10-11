@@ -7,6 +7,7 @@ const config = [
   {
     ignores: [
       '.next/**',
+      '.worktrees/**',
       'node_modules/**',
       'reference-original/**',
       'next-env.d.ts',
