@@ -183,7 +183,7 @@ function setupUploaders(): void {
   const form = document.querySelector<HTMLFormElement>('form[data-api-form*="mapaba"]');
   if (form) {
     form.dataset.getDraft = 'pending';
-    Object.defineProperty(form, '__getUploadDraft', { value: getDraft });
+    (form as HTMLFormElement & { __getUploadDraft?: () => Promise<{ draftId: string; token: string }> }).__getUploadDraft = getDraft;
   }
 }
 
@@ -206,7 +206,7 @@ function setupForm(form: HTMLFormElement): void {
 
   const updateRegistrationState = () => {
     if (!isMapaba) return;
-    const closeRaw = form.dataset.registrationCloses || '2026-11-01T23:59:59+07:00';
+    const closeRaw = form.dataset.registrationCloses || '2026-11-03T23:59:59+07:00';
     const closesAt = new Date(closeRaw).getTime();
     const isOpen = Date.now() <= closesAt;
     const button = form.querySelector<HTMLButtonElement>('[data-submit]');
@@ -221,7 +221,7 @@ function setupForm(form: HTMLFormElement): void {
     }
     if (banner) banner.hidden = isOpen;
     if (title && !isOpen) title.textContent = 'Pendaftaran Ditutup';
-    if (message && !isOpen) message.textContent = 'Pendaftaran MAPABA SAINTEK Ke-XVII telah ditutup pada 1 November 2026.';
+    if (message && !isOpen) message.textContent = 'Pendaftaran MAPABA SAINTEK Ke-XVII telah ditutup pada 3 November 2026.';
   };
   updateRegistrationState();
   if (isMapaba) window.setInterval(updateRegistrationState, 30_000);
@@ -429,7 +429,7 @@ function setupUI(): void {
 
   const countdown = document.querySelector<HTMLElement>('[data-countdown]');
   if (countdown) {
-    const deadline = new Date(countdown.dataset.countdown || '2026-11-01T23:59:59+07:00').getTime();
+    const deadline = new Date(countdown.dataset.countdown || '2026-11-03T23:59:59+07:00').getTime();
     const tick = () => {
       const remaining = Math.max(0, deadline - Date.now());
       const seconds = Math.floor(remaining / 1000);
