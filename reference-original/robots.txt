@@ -1,4 +1,4 @@
-﻿# robots.txt â€” PR PMII Sains dan Teknologi UIN Sunan Gunung Djati Cabang Kabupaten Bandung
+﻿# robots.txt ”” PR PMII Sains dan Teknologi UIN Sunan Gunung Djati Cabang Kabupaten Bandung
 User-agent: *
 Allow: /
 

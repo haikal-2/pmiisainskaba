@@ -91,7 +91,7 @@ function validateAdminPath(raw: string | undefined): string {
 function validateTrustedClientIpHeader(raw: string | undefined): string {
   const value = raw?.trim() ?? '';
   if (!value) return '';
-  // Hanya header tunggal, huruf kecil, tanpa spasi â€” tidak ada daftar berantai.
+  // Hanya header tunggal, huruf kecil, tanpa spasi ”” tidak ada daftar berantai.
   if (!/^[a-z0-9-]{3,64}$/.test(value)) {
     throw new Error('TRUSTED_CLIENT_IP_HEADER harus satu nama header huruf kecil, tanpa daftar berantai.');
   }
@@ -139,7 +139,7 @@ export function parseServerConfig(env: Environment) {
     googleSheets: {
       // Tanpa nilai bawaan yang menunjuk endpoint produksi. Endpoint webhook hanya
       // boleh datang dari environment (lihat `.env.example`). Nilai bawaan pernah
-      // membuat test ikut mengirim data peserta ke spreadsheet sungguhan â€” test
+      // membuat test ikut mengirim data peserta ke spreadsheet sungguhan ”” test
       // memakai `tests/empty.env` justru supaya integrasi eksternal tidak aktif.
       advocacyWebhookUrl: env.GOOGLE_SHEETS_ADVOKASI_WEBHOOK_URL?.trim() ?? '',
       mapabaWebhookUrl: env.GOOGLE_SHEETS_MAPABA_WEBHOOK_URL?.trim() ?? '',
