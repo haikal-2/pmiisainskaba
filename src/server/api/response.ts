@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { ZodError } from 'zod';
 
 import { AppError, isAppError } from '@/server/errors';
+import { classifyError, logEvent, type LogFields } from '@/server/observability/logger';
 
 export type ApiSuccess<T> = { data: T; requestId: string };
 export type ApiFailure = {
@@ -25,11 +26,18 @@ export function noContent(headers?: HeadersInit): Response {
   return new Response(null, { status: 204, headers: merged });
 }
 
-export function fail(error: unknown, request?: Request): Response {
+export function fail(error: unknown, request?: Request, context?: FailContext): Response {
   const requestId = randomUUID();
   let appError: AppError;
+  const operation = context?.operation;
   if (isAppError(error)) {
     appError = error;
+    // 4xx yang memang direncanakan tidak perlu noise; 5xx dan kegagalan dependency selalu dicatat.
+    if (appError.status >= 500 || appError.code === 'DEPENDENCY_UNAVAILABLE') {
+      logEvent('error', 'request.failed', buildLogFields({ requestId, request, operation, appError, error }));
+    } else {
+      logEvent('info', 'request.rejected', buildLogFields({ requestId, request, operation, appError, error }));
+    }
   } else if (error instanceof ZodError) {
     const fields: Record<string, string> = {};
     for (const issue of error.issues) {
@@ -37,9 +45,11 @@ export function fail(error: unknown, request?: Request): Response {
       fields[key] ??= issue.message;
     }
     appError = AppError.validation('Beberapa kolom masih perlu diperbaiki.', fields);
+    logEvent('info', 'request.rejected', buildLogFields({ requestId, request, operation, appError, error }));
   } else {
-    // Log hanya metadata aman. Jangan log body, query, token, atau data sensitif.
-    console.error(JSON.stringify({ requestId, method: request?.method, path: safePath(request), error: safeErrorName(error) }));
+    // Log hanya metadata aman (kode/constraint Postgres, nama error, komponen asal).
+    // Jangan pernah log body, query, token, pathname berkas privat, atau data pribadi.
+    logEvent('error', 'request.failed', buildLogFields({ requestId, request, operation, error }));
     appError = new AppError('INTERNAL', 'Permintaan gagal diproses. Silakan coba lagi.');
   }
   const body: ApiFailure = {
@@ -59,6 +69,30 @@ export function fail(error: unknown, request?: Request): Response {
   });
 }
 
+type FailContext = { operation?: string };
+
+function buildLogFields(input: {
+  requestId: string;
+  request?: Request;
+  operation?: string;
+  appError?: AppError;
+  error?: unknown;
+}): LogFields {
+  const error = input.appError ?? input.error;
+  const classified = classifyError(error);
+  return {
+    requestId: input.requestId,
+    ...(input.operation ? { operation: input.operation } : {}),
+    component: input.appError ? 'http' : classified.component,
+    errorCode: input.appError?.code ?? classified.errorName,
+    errorName: classified.errorName,
+    ...(classified.pgCode ? { pgCode: classified.pgCode } : {}),
+    ...(classified.pgConstraint ? { pgConstraint: classified.pgConstraint } : {}),
+    method: input.request?.method,
+    path: safePath(input.request),
+  };
+}
+
 function safePath(request?: Request): string | undefined {
   if (!request) return undefined;
   try {
@@ -67,14 +101,6 @@ function safePath(request?: Request): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-function safeErrorName(error: unknown): string {
-  return error instanceof Error ? error.name : 'UnknownError';
-}
-
-export function readJson<T>(request: Request): Promise<T> {
-  return request.json() as Promise<T>;
 }
 
 export function withNoStore(headers?: HeadersInit): Headers {

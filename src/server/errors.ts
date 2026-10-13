@@ -91,10 +91,3 @@ export function pgConstraint(error: unknown): string | undefined {
   const candidate = (error as { constraint?: unknown }).constraint;
   return typeof candidate === 'string' ? candidate : undefined;
 }
-
-/** Pesan aman untuk log server: tanpa payload sensitif. */
-export function describeError(error: unknown): string {
-  if (isAppError(error)) return `${error.code}: ${error.message}`;
-  if (error instanceof Error) return `${error.name}: ${error.message}`;
-  return 'UnknownError';
-}

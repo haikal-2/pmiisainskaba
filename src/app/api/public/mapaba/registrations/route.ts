@@ -1,52 +1,73 @@
-import { randomUUID } from 'node:crypto';
-
-import { createMapabaRegistration } from '@/server/services/submissions';
-import { finalizeMapabaDraft, verifyMapabaDraftFiles } from '@/server/services/uploads';
-import { mapabaRegistrationSchema, flattenFieldErrors } from '@/server/schemas';
+import { flattenFieldErrors, mapabaRegistrationSchema } from '@/server/schemas';
 import { enforceRateLimit } from '@/server/security/rate-limit';
+import { clientSubject } from '@/server/security/client-identity';
+import { verifyCaptchaToken } from '@/server/security/captcha';
+import config from '@/server/config';
+import { assertJsonBodySize } from '@/server/security/request-size';
+import { createMapabaRegistrationWithMedia } from '@/server/services/submissions';
 import { fail, ok } from '@/server/api/response';
 import { AppError } from '@/server/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function requestSubject(request: Request): string {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown-client';
-}
-
+/**
+ * Pendaftaran MAPABA.
+ *
+ * Satu permintaan menuntaskan seluruh rantai: validasi draft, kunci kuota, insert
+ * peserta, finalisasi berkas, dan penulisan outbox — semuanya dalam satu transaksi di
+ * `createMapabaRegistrationWithMedia`. Respons 201 karena itu berarti pendaftaran
+ * BENAR-BENAR tersimpan, bukan sekadar berkas berhasil diunggah.
+ *
+ * Klien mengirim `reference` (pathname kanonik hasil unggah), bukan URL. Tidak ada
+ * skema `local-upload:/` atau URL Blob bertanda tangan yang pernah diterima di sini.
+ */
 export async function POST(request: Request): Promise<Response> {
   try {
-    await enforceRateLimit('mapaba-registration', requestSubject(request), {
+    assertJsonBodySize(request);
+    await enforceRateLimit('mapaba-registration', clientSubject(request), {
       limit: 5,
       windowSeconds: 60 * 60,
       blockSeconds: 60 * 60,
     });
+
     const body = (await request.json()) as Record<string, unknown>;
     const draftId = typeof body.draftId === 'string' ? body.draftId : '';
     const draftToken = typeof body.draftToken === 'string' ? body.draftToken : '';
+    if (!draftId || !draftToken) {
+      throw AppError.validation('Sesi unggah berkas tidak ditemukan. Unggah ulang pas foto dan KTM.');
+    }
     const parsed = mapabaRegistrationSchema.safeParse(body);
     if (!parsed.success) {
       throw AppError.validation('Beberapa kolom masih perlu diperbaiki.', flattenFieldErrors(parsed.error));
     }
-    if (!draftId || !draftToken) throw AppError.validation('Sesi unggah berkas tidak ditemukan. Unggah ulang pas foto dan KTM.');
 
-    const media = await verifyMapabaDraftFiles(
-      draftId,
-      draftToken,
-      parsed.data.pasFotoUrl,
-      parsed.data.ktmUrl,
+    // Verifikasi CAPTCHA sisi server (fail-closed ketika provider aktif).
+    try {
+      await verifyCaptchaToken(config.captcha, parsed.data.captchaToken ?? '', undefined);
+    } catch {
+      throw AppError.validation('Verifikasi captcha gagal. Silakan coba lagi.');
+    }
+
+    const created = await createMapabaRegistrationWithMedia({
+      data: parsed.data,
+      draft: { draftId, token: draftToken },
+      files: [
+        { reference: parsed.data.pasFotoUrl, kind: 'pasFoto' },
+        { reference: parsed.data.ktmUrl, kind: 'ktm' },
+      ],
+    });
+
+    return ok(
+      {
+        nomorRegistrasi: created.registrationNumber,
+        // URL aman untuk ditampilkan/disalin admin. ID tiket ini yang juga dipakai
+        // sebagai identitas baris di Google Sheets.
+        berkasPath: `/api/admin/mapaba/registrations/${created.registrationId}/media`,
+      },
+      201,
     );
-    const created = await createMapabaRegistration(parsed.data, media);
-    await finalizeMapabaDraft(
-      draftId,
-      draftToken,
-      media.photoMediaId,
-      media.ktmMediaId,
-      created.registrationId,
-    );
-    const requestId = randomUUID();
-    return ok({ nomorRegistrasi: created.registrationNumber }, 201, { 'X-Request-Id': requestId });
   } catch (error) {
-    return fail(error, request);
+    return fail(error, request, { operation: 'mapaba.registration' });
   }
 }

@@ -105,9 +105,11 @@ function RecordDetail({ module, item, detail, onClose }: { module: 'advokasi' | 
   const [note, setNote] = useState('');
   const [message, setMessage] = useState('');
   const report = detail?.report as Record<string, unknown> | undefined;
+  const registration = detail?.registration as Record<string, unknown> | undefined;
+  const registrationId = Number(registration?.id);
   const fields = module === 'advokasi'
     ? [['Nama pelapor', report?.reporter_name], ['Kontak', report?.contact], ['Email', report?.email], ['Status pelapor', report?.reporter_status], ['Kategori', report?.category], ['Kronologi', report?.chronology], ['Tautan bukti', report?.evidence_url], ['Rahasiakan identitas', report?.confidential]]
-    : Object.entries((detail?.registration as Record<string, unknown> | undefined) ?? {}).map(([key, value]) => [key, value]);
+    : Object.entries(registration ?? {}).filter(([key]) => key !== 'photo_media_id' && key !== 'ktm_media_id').map(([key, value]) => [key, value]);
 
   async function updateStatus() {
     const response = await fetch(`/api/admin/advocacy/reports/${item.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
@@ -135,6 +137,10 @@ return (
       <div className="flex items-start justify-between gap-4"><div><p className="section-eyebrow">Data privat</p><h2 id="detail-title" className="mt-2 font-display text-xl font-bold text-pmii-950">{String(item.ticket ?? item.registration_number ?? 'Detail')}</h2></div><button className="btn-outline btn-sm" onClick={onClose} type="button">Tutup</button></div>
       {!detail ? <p className="mt-6 text-sm text-slate-500">Memuat detail…</p> : <div className="mt-6 space-y-4">
         <dl className="grid gap-3 sm:grid-cols-2">{fields.map(([label, value]) => <div key={String(label)} className="rounded-xl bg-slate-50 p-3"><dt className="text-xs font-semibold uppercase text-slate-500">{String(label)}</dt><dd className="mt-1 break-words whitespace-pre-wrap text-sm text-slate-800">{formatValue(value as string | number | boolean | null)}</dd></div>)}</dl>
+        {module === 'mapaba' && Number.isSafeInteger(registrationId) && registrationId > 0 && <div className="flex flex-wrap gap-3">
+          <a className="admin-button admin-button-primary" href={`/api/admin/mapaba/registrations/${registrationId}/media/photo`} target="_blank" rel="noreferrer">Lihat pas foto</a>
+          <a className="admin-button admin-button-primary" href={`/api/admin/mapaba/registrations/${registrationId}/media/ktm`} target="_blank" rel="noreferrer">Lihat KTM</a>
+        </div>}
         {module === 'advokasi' && <>
           <div className="flex flex-wrap items-end gap-3"><label className="flex-1 text-sm font-semibold">Status tindak lanjut<select className="admin-field mt-1" value={status} onChange={(event) => setStatus(event.target.value)}><option value="baru">Baru</option><option value="diverifikasi">Diverifikasi</option><option value="didampingi">Didampingi</option><option value="selesai">Selesai</option><option value="ditutup">Ditutup</option></select></label><button type="button" className="admin-button admin-button-primary" onClick={() => void updateStatus()}>Simpan status</button></div>
           <form onSubmit={(event) => void addNote(event)} className="space-y-2"><label className="text-sm font-semibold">Catatan privat<textarea className="admin-field mt-1-h-24" value={note} onChange={(event) => setNote(event.target.value)} maxLength={4000} required /></label><button className="admin-button admin-button-primary" type="submit">Tambah catatan</button></form>

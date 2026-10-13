@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 import type { Database } from '../../src/server/db/types';
+import type { ComposioSession } from '../../src/server/integrations/composio/types';
 
 const loadConfig = () => import('../../src/server/config-values.js');
 const testEnv = { NODE_ENV: 'test', DATABASE_URL: 'postgresql://test:test@127.0.0.1:5432/pmii_test' };
@@ -19,6 +20,9 @@ const loadAdminSessionService = () => import('../../src/server/auth/admin-servic
 const loadAdminLoginInput = () => import('../../src/server/auth/login-input.js');
 const loadRequestOrigin = () => import('../../src/server/auth/request-origin.js');
 const loadRateLimitService = () => import('../../src/server/security/rate-limit-service.js');
+const loadComposioIdentity = () => import('../../src/server/integrations/composio/identity.js');
+const loadComposioRepository = () => import('../../src/server/integrations/composio/repository.js');
+const loadComposioOperations = () => import('../../src/server/integrations/composio/operations.js');
 
 async function withMigrationDirectory(
   migrationSql: string,
@@ -484,4 +488,216 @@ test('rate limiting shares username buckets across instances and persists only H
   } finally {
     await database.close();
   }
+});
+
+test('composio identity is stable, namespaced, and rejects invalid admin ids', async () => {
+  const { composioUserIdForAdmin, isComposioUserIdForAdmin } = await loadComposioIdentity();
+
+  assert.equal(composioUserIdForAdmin(1), 'pmii-admin-1');
+  assert.equal(composioUserIdForAdmin(1), composioUserIdForAdmin(1));
+  assert.notEqual(composioUserIdForAdmin(1), composioUserIdForAdmin(2));
+  assert.equal(isComposioUserIdForAdmin('pmii-admin-1'), true);
+  assert.equal(isComposioUserIdForAdmin('user_123'), false);
+  assert.equal(isComposioUserIdForAdmin('pmii-admin-'), false);
+
+  for (const invalid of [0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 2]) {
+    assert.throws(() => composioUserIdForAdmin(invalid), /tidak valid/);
+  }
+});
+
+test('composio configuration is optional and never required for the server to start', async () => {
+  const { parseServerConfig } = await loadConfig();
+
+  assert.equal(parseServerConfig(testEnv).composio.apiKey, '');
+  assert.equal(
+    parseServerConfig({ ...testEnv, COMPOSIO_API_KEY: '  ak_example_key  ' }).composio.apiKey,
+    'ak_example_key',
+  );
+});
+
+test('composio session repository round-trips, upserts, and cascades with the admin account', async () => {
+  const { createPgliteDatabase } = await loadPgliteDatabase();
+  const { runMigrations } = await loadMigrations();
+  const { createAdminAccount } = await loadAdminOperations();
+  const repository = await loadComposioRepository();
+  const database = await createPgliteDatabase();
+  try {
+    await runMigrations(database);
+    await createAdminAccount(database, 'admin.test', 'argon-hash');
+    assert.equal(await repository.findComposioSession(database, 1), null);
+
+    const saved = await repository.saveComposioSession(database, {
+      adminId: 1,
+      userId: 'pmii-admin-1',
+      sessionId: 'session-one',
+      toolkits: ['gmail'],
+    });
+    assert.equal(saved.sessionId, 'session-one');
+    assert.equal(saved.userId, 'pmii-admin-1');
+    assert.deepEqual(saved.toolkits, ['gmail']);
+
+    const found = await repository.findComposioSession(database, 1);
+    assert.equal(found?.sessionId, 'session-one');
+    assert.deepEqual(found?.toolkits, ['gmail']);
+
+    const updated = await repository.saveComposioSession(database, {
+      adminId: 1,
+      userId: 'pmii-admin-1',
+      sessionId: 'session-two',
+      toolkits: ['gmail', 'github'],
+    });
+    assert.equal(updated.sessionId, 'session-two');
+    assert.deepEqual(updated.toolkits, ['gmail', 'github']);
+    assert.equal(updated.createdAt.getTime(), saved.createdAt.getTime());
+
+    await repository.replaceComposioSessionToolkits(database, 1, ['slack']);
+    assert.deepEqual((await repository.findComposioSession(database, 1))?.toolkits, ['slack']);
+
+    assert.equal(await repository.deleteComposioSession(database, 1), true);
+    assert.equal(await repository.deleteComposioSession(database, 1), false);
+    assert.equal(await repository.findComposioSession(database, 1), null);
+
+    await repository.saveComposioSession(database, {
+      adminId: 1,
+      userId: 'pmii-admin-1',
+      sessionId: 'session-three',
+      toolkits: [],
+    });
+    await database.query('DELETE FROM admin_account WHERE id = 1');
+    assert.equal(await repository.findComposioSession(database, 1), null);
+  } finally {
+    await database.close();
+  }
+});
+
+test('composio session table stores no credentials and denies anonymous access', async () => {
+  const { createPgliteDatabase } = await loadPgliteDatabase();
+  const { runMigrations } = await loadMigrations();
+  const database = await createPgliteDatabase();
+  try {
+    await runMigrations(database);
+
+    const columns = await database.query<{ column_name: string }>(
+      "SELECT column_name FROM information_schema.columns WHERE table_name = 'composio_session'",
+    );
+    assert.deepEqual(columns.rows.map((row) => row.column_name).sort(), [
+      'admin_id',
+      'created_at',
+      'session_id',
+      'toolkits',
+      'updated_at',
+      'user_id',
+    ]);
+
+    const security = await database.query<{ relrowsecurity: boolean }>(
+      "SELECT relrowsecurity FROM pg_class WHERE relname = 'composio_session'",
+    );
+    assert.equal(security.rows[0]?.relrowsecurity, true);
+  } finally {
+    await database.close();
+  }
+});
+
+function fakeComposioSession(session: Record<string, unknown>): ComposioSession {
+  return session as unknown as ComposioSession;
+}
+
+test('composio operations read connection state, issue connect links, and never invent slugs', async () => {
+  const { listToolkitConnections, beginToolkitConnection, searchTools, executeTool } =
+    await loadComposioOperations();
+
+  const session = fakeComposioSession({
+    toolkits: async () => ({
+      items: [
+        {
+          slug: 'gmail',
+          name: 'Gmail',
+          isNoAuth: false,
+          connection: {
+            isActive: true,
+            connectedAccount: { id: 'ca_123', status: 'ACTIVE' },
+          },
+        },
+        { slug: 'hackernews', name: 'Hacker News', isNoAuth: true },
+      ],
+      totalPages: 1,
+    }),
+    authorize: async () => ({
+      id: 'req_123',
+      redirectUrl: 'https://connect.composio.dev/link/example',
+      status: 'INITIALIZING',
+    }),
+    search: async () => ({
+      results: [
+        {
+          primaryToolSlugs: ['GMAIL_FETCH_EMAILS'],
+          relatedToolSlugs: ['GMAIL_GET_PROFILE', 'GMAIL_FETCH_EMAILS'],
+        },
+      ],
+      toolSchemas: {
+        GMAIL_FETCH_EMAILS: { toolkit: 'gmail', description: 'Fetch emails' },
+      },
+    }),
+    execute: async () => ({ data: { messages: [] }, error: null, logId: 'log_123' }),
+  });
+
+  const connections = await listToolkitConnections(session, ['gmail', 'hackernews']);
+  assert.equal(connections.length, 2);
+  assert.deepEqual(connections[0], {
+    toolkit: 'gmail',
+    name: 'Gmail',
+    isNoAuth: false,
+    isConnected: true,
+    accountId: 'ca_123',
+    accountStatus: 'ACTIVE',
+  });
+  assert.deepEqual(connections[1], {
+    toolkit: 'hackernews',
+    name: 'Hacker News',
+    isNoAuth: true,
+    isConnected: false,
+    accountId: null,
+    accountStatus: null,
+  });
+
+  const link = await beginToolkitConnection(session, 'gmail');
+  assert.equal(link.redirectUrl, 'https://connect.composio.dev/link/example');
+  assert.equal(link.requestId, 'req_123');
+
+  const matches = await searchTools(session, 'list my unread email', ['gmail']);
+  assert.deepEqual(matches.map((match) => match.slug), ['GMAIL_FETCH_EMAILS', 'GMAIL_GET_PROFILE']);
+  assert.equal(matches[0]?.toolkit, 'gmail');
+  assert.equal(matches[1]?.toolkit, '');
+
+  const result = await executeTool(session, 'GMAIL_FETCH_EMAILS', { query: 'is:unread' });
+  assert.deepEqual(result, {
+    toolSlug: 'GMAIL_FETCH_EMAILS',
+    logId: 'log_123',
+    successful: true,
+    error: null,
+    data: { messages: [] },
+  });
+});
+
+test('composio operations surface provider errors and refuse a link without a redirect URL', async () => {
+  const { beginToolkitConnection, executeTool } = await loadComposioOperations();
+
+  await assert.rejects(
+    beginToolkitConnection(
+      fakeComposioSession({ authorize: async () => ({ id: 'req_456', redirectUrl: null }) }),
+      'gmail',
+    ),
+    /tautan koneksi/,
+  );
+
+  const failed = await executeTool(
+    fakeComposioSession({
+      execute: async () => ({ data: {}, error: 'Provider 401: token revoked', logId: 'log_500' }),
+    }),
+    'GMAIL_FETCH_EMAILS',
+    {},
+  );
+  assert.equal(failed.successful, false);
+  assert.equal(failed.error, 'Provider 401: token revoked');
+  assert.equal(failed.logId, 'log_500');
 });

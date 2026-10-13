@@ -1,4 +1,4 @@
-# robots.txt — PR PMII Sains dan Teknologi UIN Sunan Gunung Djati Cabang Kabupaten Bandung
+﻿# robots.txt â€” PR PMII Sains dan Teknologi UIN Sunan Gunung Djati Cabang Kabupaten Bandung
 User-agent: *
 Allow: /
 
@@ -13,4 +13,5 @@ Crawl-delay: 10
 User-agent: SemrushBot
 Crawl-delay: 10
 
-Sitemap: https://www.pmiiuinsgd.site/sitemap.xml
+Sitemap: https://www.pmiisainskaba/sitemap.xml
+

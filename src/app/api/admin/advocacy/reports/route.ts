@@ -1,5 +1,5 @@
-import { query } from '@/server/db/pool';
 import { requireAdmin } from '@/server/auth/admin';
+import { query } from '@/server/db/pool';
 import { paginationSchema } from '@/server/schemas';
 import { fail, ok, withNoStore } from '@/server/api/response';
 
@@ -33,6 +33,6 @@ export async function GET(request: Request): Promise<Response> {
     );
     return ok({ items: result.rows, page, perPage, total: Number(count.rows[0]?.count ?? 0) }, 200, withNoStore());
   } catch (error) {
-    return fail(error, request);
+    return fail(error, request, { operation: 'admin.advocacy.list' });
   }
 }

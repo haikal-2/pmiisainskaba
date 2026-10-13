@@ -9,7 +9,7 @@ TypeScript frontend/backend, Next.js fullstack, PostgreSQL, Vercel, seluruh modu
 1. Aset yang tersedia dari pengguna: **hanya logo**. Source code asli tidak disediakan. Sesuai DESIGN_REFERENCE.md, website live menjadi dasar migrasi; HTML/CSS/JS/aset referensi diunduh ke `reference-original/` sebagai acuan visual (read-only).
 2. Path admin: **`/admin-secret`** (diketik langsung, tanpa tautan publik).
 3. Desain panel admin: mengikuti gaya website referensi (warna pmii/kuning, kartu, tailwind asli).
-4. Jadwal registrasi MAPABA: **selalu buka**, penutupan **1 November 2026**, zona waktu **Asia/Jakarta (WIB)**.
+4. Jadwal registrasi MAPABA: **pendaftaran ditutup pada 3 November 2026 pukul 23:59 WIB**, countdown waktu berjalan aktif sampai penutupan, **waktu pelaksanaan kegiatan: 6–8 November 2026**.
 5. Eligibilitas: **UIN SGD atau kampus lain di Kabupaten Bandung**. Field universitas diubah menjadi pilihan (select) dengan opsi UIN SGD + opsi kampus lain.
 6. Duplikasi: ya, dicegah pada NIM/email/telepon. **Kuota 100** dihitung dari seluruh pendaftar valid (bukan per status).
 7. Kontribusi Rp75.000 dibayar **di luar website**; tidak ada payment gateway. Tidak dicatat sebagai status pembayaran.
@@ -17,7 +17,7 @@ TypeScript frontend/backend, Next.js fullstack, PostgreSQL, Vercel, seluruh modu
 9. Dokumen Landasan Hukum: tetap **tautan (Google Drive)**; tidak diunggah ke storage.
 10. Galeri: album/kartu harus berfungsi (lightbox + muat lebih banyak).
 11. Fitur ujian: **tidak ada**; jangan dibuat.
-12. Notifikasi tiket Advokasi/MAPABA: kirim ke **Google Sheets** (bukan email). MAPABA juga dicatat ke Google Sheets. Tidak ada provider email.
+12. Notifikasi tiket Advokasi/MAPABA: dikirim **secara real-time ke Google Sheets via Google Apps Script Webhooks** (`GOOGLE_SHEETS_ADVOKASI_WEBHOOK_URL` dan `GOOGLE_SHEETS_MAPABA_WEBHOOK_URL`). Outbox tetap mencatat event sebagai cadangan sinkronisasi.
 13. Status pengaduan + catatan tindak lanjut: **ya, dikelola admin** (status + catatan privat). Pelacakan tiket publik: tidak ada (hanya admin).
 14. Durasi sesi admin: **tidak ditentukan**; memakai nilai konfigurasi wajar (default 7 hari) dan dapat diubah lewat env.
 15. Rate limit tanpa IP mentah: **ya**, memakai hash turunan identifier + persisten di database.
@@ -51,7 +51,6 @@ TypeScript frontend/backend, Next.js fullstack, PostgreSQL, Vercel, seluruh modu
 
 ## Sisa pilihan yang perlu dikonfirmasi pengguna
 - Kuota dihitung dari seluruh pendaftar valid (asumsi berdasarkan jawaban 6). Bila berbeda, beri tahu.
-- Sesi admin default 7 hari (dapat diubah via `ADMIN_SESSION_TTL_SECONDS`).
-- Google Sheets: dibutuhkan ID spreadsheet dan kredensial service account (file kunci) lewat environment; tanpa itu integrasi Sheets ditandai belum terverifikasi.
+- Google Sheets: Menggunakan Webhook URL Google Apps Script yang disediakan pengguna untuk integrasi real-time (Advokasi & MAPABA).
 
 Pertanyaan dapat digabung dalam kelompok singkat. Jangan membebani pengguna dengan detail yang sudah pasti dari source. Jika source menjawab pertanyaan teknis, catat sumbernya dan tanyakan hanya konflik atau pilihan bisnis yang tersisa.

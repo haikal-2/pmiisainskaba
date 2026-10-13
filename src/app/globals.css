@@ -38,3 +38,23 @@ body { min-width: 320px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* ===== Aksesibilitas tambahan ===== */
+
+/* Hormati preferensi pengguna yang meminta pengurangan gerakan (WCAG 2.3.3).
+   Animasi reveal, countdown pulse, dan smooth-scroll dimatikan. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+  .reveal, .reveal * { transition: none !important; animation: none !important; }
+  .reveal { opacity: 1 !important; transform: none !important; }
+  .reveal.is-visible { opacity: 1 !important; transform: none !important; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* Skip link: muncul hanya saat menerima fokus keyboard. */
+.skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  background: #122a8f; color: #fff; padding: .75rem 1.25rem;
+  border-radius: 0 0 .75rem 0; font-weight: 700; font-size: .875rem;
+}
+.skip-link:focus { left: 0; }

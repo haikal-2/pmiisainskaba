@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { timingSafeEqual, createHmac, randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { query } from '@/server/db/pool';
 import { getDatabase } from '@/server/db/database';
 import config from '@/server/config';
@@ -81,11 +81,4 @@ export async function setIdempotencyResult(
      WHERE scope = $1 AND idempotency_hash = $2`,
     [scope, makeIdempotencyHash(key), kind, ref],
   );
-}
-
-/** Compare HMAC digests timing-safely (for opaque draft tokens). */
-export function constantTimeStringEqual(left: string, right: string): boolean {
-  const a = Buffer.from(left);
-  const b = Buffer.from(right);
-  return a.length === b.length && timingSafeEqual(a, b);
 }

@@ -1,19 +1,38 @@
 import 'server-only';
 
-import { del, get, put } from '@vercel/blob';
-import { randomBytes } from 'node:crypto';
+import { get, put } from '@vercel/blob';
 
 import config from '@/server/config';
 import { AppError } from '@/server/errors';
+import { isPrivatePathname } from './reference';
+
+/**
+ * Pembungkus tipis Vercel Blob private.
+ *
+ * Modul ini tidak tahu apa-apa soal fallback lokal: pemilihan driver ada di
+ * `storage/private-storage.ts`. Di sini setiap operasi selalu ke Blob dan gagal
+ * keras bila kredensial belum ada.
+ */
 
 export type AllowedImageMime = 'image/jpeg' | 'image/png' | 'image/webp';
 
+const ALLOWED_IMAGE_MIMES: readonly AllowedImageMime[] = ['image/jpeg', 'image/png', 'image/webp'];
+
+export function isBlobConfigured(): boolean {
+  return Boolean(config.blobReadWriteToken || process.env.VERCEL_OIDC_TOKEN);
+}
+
 export function assertBlobConfigured(): void {
-  if (!config.blobReadWriteToken && !process.env.VERCEL_OIDC_TOKEN) {
-    throw new AppError('DEPENDENCY_UNAVAILABLE', 'Penyimpanan berkas belum dikonfigurasi.');
+  if (!isBlobConfigured()) {
+    throw new AppError('DEPENDENCY_UNAVAILABLE', 'Penyimpanan berkas (Vercel Blob) belum dikonfigurasi.');
   }
 }
 
+export function isAllowedImageMime(value: string): value is AllowedImageMime {
+  return (ALLOWED_IMAGE_MIMES as readonly string[]).includes(value);
+}
+
+/** Cocokkan magic bytes dengan tipe yang diklaim klien sebelum menyentuh storage. */
 export async function verifyImageSignature(file: File): Promise<AllowedImageMime> {
   const bytes = new Uint8Array(await file.slice(0, 16).arrayBuffer());
   const mime: AllowedImageMime | null =
@@ -30,34 +49,35 @@ export async function verifyImageSignature(file: File): Promise<AllowedImageMime
     throw new AppError('UNSUPPORTED_MEDIA_TYPE', 'Isi berkas tidak cocok dengan format JPG, PNG, atau WebP.');
   }
   if (file.size <= 0 || file.size > config.maxUploadBytes) {
-    throw new AppError('PAYLOAD_TOO_LARGE', 'Ukuran berkas harus lebih dari 0 dan maksimal 3 MB.');
+    throw new AppError(
+      'PAYLOAD_TOO_LARGE',
+      `Ukuran berkas harus lebih dari 0 dan maksimal ${Math.floor(config.maxUploadBytes / (1024 * 1024))} MB.`,
+    );
   }
   return mime;
 }
 
-export async function uploadPrivateMapabaFile(file: File, kind: 'pasFoto' | 'ktm') {
+export async function putPrivateBlob(
+  pathname: string,
+  file: File,
+  contentType: AllowedImageMime,
+): Promise<{ pathname: string }> {
   assertBlobConfigured();
-  const mimeType = await verifyImageSignature(file);
-  const randomKey = randomBytes(24).toString('hex');
-  const pathname = `mapaba-private/${randomKey}/${kind}`;
+  if (!isPrivatePathname(pathname)) throw AppError.validation('Kunci objek privat tidak valid.');
   const blob = await put(pathname, file, {
     access: 'private',
-    contentType: mimeType,
+    contentType,
     addRandomSuffix: false,
     token: config.blobReadWriteToken || undefined,
   });
-  return { pathname: blob.pathname, url: blob.url, contentType: mimeType, size: file.size };
+  return { pathname: blob.pathname };
 }
 
-export async function getPrivateBlob(pathname: string) {
+export async function readPrivateBlob(pathname: string) {
   assertBlobConfigured();
+  if (!isPrivatePathname(pathname)) throw AppError.notFound();
   return get(pathname, {
     access: 'private',
     token: config.blobReadWriteToken || undefined,
   });
-}
-
-export async function deleteBlob(url: string): Promise<void> {
-  assertBlobConfigured();
-  await del(url, { token: config.blobReadWriteToken || undefined });
 }

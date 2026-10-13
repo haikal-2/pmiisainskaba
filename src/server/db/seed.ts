@@ -154,7 +154,7 @@ async function seedMapaba(database: DbExecutor, options: MapabaSeedOptions): Pro
     [
       'MAPABA Raya 2026',
       'MAPABA SAINTEK Ke-XVII',
-      '31 Okt – 2 Nov 2026',
+      '6–8 November 2026',
       'Cileunyi, Kab. Bandung',
       options.quota,
       options.contributionLabel,
@@ -203,7 +203,7 @@ export async function seedPublicContent(
   sourceRoot = resolve(process.cwd(), 'reference-original'),
   mapaba: MapabaSeedOptions = {
     quota: 100,
-    closesAt: '2026-11-01T23:59:59+07:00',
+    closesAt: '2026-11-03T23:59:59+07:00',
     timeZone: 'Asia/Jakarta',
     contributionLabel: 'Rp75.000',
     faculty: 'Sains dan Teknologi',

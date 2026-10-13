@@ -1,4 +1,4 @@
-export type Environment = Record<string, string | undefined>;
+﻿export type Environment = Record<string, string | undefined>;
 
 const RESERVED_ADMIN_PATHS = new Set([
   'api', 'assets', 'profil', 'kopri', 'galeri', 'landasan-hukum', 'advokasi',
@@ -64,10 +64,36 @@ function validateDatabaseUrl(raw: string): string {
   return raw;
 }
 
+function readCaptchaConfig(env: {
+  CAPTCHA_PROVIDER?: string;
+  CAPTCHA_SECRET_KEY?: string;
+  isProduction: boolean;
+}): { provider: '' | 'turnstile' | 'recaptcha' | 'recaptcha3'; secretKey: string } {
+  const provider = (env.CAPTCHA_PROVIDER?.trim().toLowerCase() || '') as '' | 'turnstile' | 'recaptcha' | 'recaptcha3';
+  const secretKey = env.CAPTCHA_SECRET_KEY?.trim() ?? '';
+  if (provider && !['turnstile', 'recaptcha', 'recaptcha3'].includes(provider)) {
+    throw new Error(`CAPTCHA_PROVIDER tidak dikenal: "${provider}". Gunakan turnstile, recaptcha, atau recaptcha3.`);
+  }
+  if (provider && !secretKey && env.isProduction) {
+    throw new Error('CAPTCHA_SECRET_KEY wajib diisi di production ketika CAPTCHA_PROVIDER aktif.');
+  }
+  return { provider, secretKey };
+}
+
 function validateAdminPath(raw: string | undefined): string {
   const value = raw?.trim() || 'admin-secret';
   if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(value) || RESERVED_ADMIN_PATHS.has(value)) {
     throw new Error(`ADMIN_PATH tidak valid atau bertabrakan dengan route publik: "${value}".`);
+  }
+  return value;
+}
+
+function validateTrustedClientIpHeader(raw: string | undefined): string {
+  const value = raw?.trim() ?? '';
+  if (!value) return '';
+  // Hanya header tunggal, huruf kecil, tanpa spasi â€” tidak ada daftar berantai.
+  if (!/^[a-z0-9-]{3,64}$/.test(value)) {
+    throw new Error('TRUSTED_CLIENT_IP_HEADER harus satu nama header huruf kecil, tanpa daftar berantai.');
   }
   return value;
 }
@@ -93,27 +119,49 @@ export function parseServerConfig(env: Environment) {
     adminPath: validateAdminPath(env.ADMIN_PATH),
     adminSessionTtlSeconds: integer(env, 'ADMIN_SESSION_TTL_SECONDS', 604800, 300, 7776000),
     uploadDraftTtlSeconds: integer(env, 'UPLOAD_DRAFT_TTL_SECONDS', 7200, 300, 86400),
+    // Kosong = header forwarding tidak dipercaya; rate limit memakai bucket bersama.
+    // Isi hanya bila proxy platform menimpa header ini (mis. `x-real-ip` di Vercel).
+    trustedClientIpHeader: validateTrustedClientIpHeader(env.TRUSTED_CLIENT_IP_HEADER),
     adminMinPasswordLength: integer(env, 'ADMIN_MIN_PASSWORD_LENGTH', 12, 8, 200),
+    // Wajib diisi agar job terjadwal (worker outbox) dapat dijalankan; kosong = endpoint cron menolak.
+    cronSecret: env.CRON_SECRET?.trim() ?? '',
     blobReadWriteToken: env.BLOB_READ_WRITE_TOKEN?.trim() ?? '',
     publicAssetsBucket: env.PUBLIC_ASSETS_BUCKET?.trim() || 'public-assets',
     privateMapabaBucket: env.PRIVATE_MAPABA_BUCKET?.trim() || 'private-mapaba',
     maxUploadBytes: integer(env, 'MAX_UPLOAD_BYTES', 3 * 1024 * 1024, 64 * 1024, 10 * 1024 * 1024),
     mapaba: {
       quota: integer(env, 'MAPABA_QUOTA', 100, 1, 100000),
-      closesAt: env.MAPABA_CLOSES_AT?.trim() || '2026-11-01T23:59:59+07:00',
+      closesAt: env.MAPABA_CLOSES_AT?.trim() || '2026-11-03T23:59:59+07:00',
       timeZone: env.MAPABA_TIME_ZONE?.trim() || 'Asia/Jakarta',
       contributionLabel: env.MAPABA_CONTRIBUTION_LABEL?.trim() || 'Rp75.000',
       faculty: env.MAPABA_FACULTY?.trim() || 'Sains dan Teknologi',
     },
     googleSheets: {
+      // Tanpa nilai bawaan yang menunjuk endpoint produksi. Endpoint webhook hanya
+      // boleh datang dari environment (lihat `.env.example`). Nilai bawaan pernah
+      // membuat test ikut mengirim data peserta ke spreadsheet sungguhan â€” test
+      // memakai `tests/empty.env` justru supaya integrasi eksternal tidak aktif.
+      advocacyWebhookUrl: env.GOOGLE_SHEETS_ADVOKASI_WEBHOOK_URL?.trim() ?? '',
+      mapabaWebhookUrl: env.GOOGLE_SHEETS_MAPABA_WEBHOOK_URL?.trim() ?? '',
       spreadsheetId: env.GOOGLE_SHEETS_SPREADSHEET_ID?.trim() ?? '',
       clientEmail: env.GOOGLE_SERVICE_ACCOUNT_EMAIL?.trim() ?? '',
       privateKey: (env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY ?? '').replace(/\\n/g, '\n').trim(),
       mapabaSheet: env.GOOGLE_SHEETS_MAPABA_TAB?.trim() || 'MAPABA',
       advocacySheet: env.GOOGLE_SHEETS_ADVOCACY_TAB?.trim() || 'Advokasi',
     },
+    composio: {
+      // Opsional: integrasi Composio tidak aktif sampai kuncinya diisi.
+      // Kunci tidak pernah dicetak atau masuk database.
+      apiKey: env.COMPOSIO_API_KEY?.trim() ?? '',
+    },
     rateLimit: { hashSalt: rateLimitHashSalt },
+    captcha: readCaptchaConfig({
+      CAPTCHA_PROVIDER: env.CAPTCHA_PROVIDER,
+      CAPTCHA_SECRET_KEY: env.CAPTCHA_SECRET_KEY,
+      isProduction,
+    }),
   } as const;
 }
 
 export type ServerConfig = ReturnType<typeof parseServerConfig>;
+

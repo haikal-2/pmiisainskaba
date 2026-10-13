@@ -38,13 +38,19 @@ function rewriteMarkup(markup: string, page: LegacyPageKey): string {
 
   if (page === 'mapaba') {
     html = html
-      .replaceAll('2026-10-01T00:00:00+07:00', '2026-01-01T00:00:00+07:00')
-      .replaceAll('2026-10-28T23:59:59+07:00', '2026-11-01T23:59:59+07:00')
+      .replaceAll('data-countdown="2026-10-01T00:00:00+07:00"', 'data-countdown="2026-11-03T23:59:59+07:00"')
+      .replaceAll('data-registration-opens="2026-10-01T00:00:00+07:00"', 'data-registration-opens="2026-01-01T00:00:00+07:00"')
+      .replaceAll('data-registration-closes="2026-10-28T23:59:59+07:00"', 'data-registration-closes="2026-11-03T23:59:59+07:00"')
+      .replaceAll('2026-10-28T23:59:59+07:00', '2026-11-03T23:59:59+07:00')
+      .replaceAll('2026-11-01T23:59:59+07:00', '2026-11-03T23:59:59+07:00')
+      .replaceAll('31 Okt – 2 Nov', '6–8 November 2026')
+      .replaceAll('31 Okt - 2 Nov', '6–8 November 2026')
       .replaceAll('1 Oktober 2026', 'Selalu dibuka')
-      .replaceAll('28 Oktober 2026', '1 November 2026')
+      .replaceAll('28 Oktober 2026', '3 November 2026')
+      .replaceAll('1 November 2026', '3 November 2026')
       .replaceAll('Pendaftaran Dibuka 1 Oktober 2026', 'Pendaftaran Dibuka')
       .replaceAll('Pendaftaran dibuka dalam', 'Pendaftaran ditutup dalam')
-      .replaceAll('2026-10-01T00:00:00+07:00', '2026-11-01T23:59:59+07:00')
+      .replaceAll('Pendaftaran Belum Dibuka', 'Pendaftaran Dibuka')
       .replaceAll('150 peserta', '100 peserta')
       .replaceAll('200 peserta', '100 peserta');
 
@@ -53,7 +59,13 @@ function rewriteMarkup(markup: string, page: LegacyPageKey): string {
       /<input class="input" id="universitas" name="universitas" type="text" required maxlength="150"[\s\S]*?data-label="Universitas"\s*\/>/,
       '<select class="input" id="universitas" name="universitas" required data-label="Universitas"><option value="UIN Sunan Gunung Djati Bandung">UIN Sunan Gunung Djati Bandung</option><option value="lainnya">Perguruan tinggi lain di Kabupaten Bandung</option></select><input class="input mt-3 hidden" id="universitasLain" type="text" maxlength="150" placeholder="Nama perguruan tinggi" aria-label="Nama perguruan tinggi">',
     );
-    html = html.replace('150 peserta', '100 peserta');
+  }
+
+  if (page === 'home') {
+    html = html
+      .replaceAll('Dibuka 1 Okt 2026', 'Pendaftaran Dibuka')
+      .replaceAll('31 Okt – 2 Nov', '6–8 November 2026')
+      .replaceAll('31 Okt - 2 Nov', '6–8 November 2026');
   }
 
   if (page === 'gallery') {
@@ -79,8 +91,21 @@ export async function LegacyPage({ page }: { page: LegacyPageKey }) {
 
   return (
     <>
-      <div dangerouslySetInnerHTML={{ __html: safeMarkup }} />
+      <div id="main-content" dangerouslySetInnerHTML={{ __html: safeMarkup }} />
+      {/* Konfigurasi widget captcha klien dibaca oleh skrip widget captcha.
+          Provider nonaktif = widget disembunyikan oleh captcha.js. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `window.PMII_CONFIG=Object.assign(window.PMII_CONFIG||{},{captcha:{provider:${JSON.stringify(
+            process.env.NEXT_PUBLIC_CAPTCHA_PROVIDER || 'none',
+          )},siteKey:${JSON.stringify(process.env.NEXT_PUBLIC_CAPTCHA_SITE_KEY || '')}}});`,
+        }}
+      />
       <LegacyInteractions page={page} />
+      {/* Widget captcha klien (hanya bila provider diisi; skrip penyedia dimuat captcha.js). */}
+      {(process.env.NEXT_PUBLIC_CAPTCHA_PROVIDER || 'none') !== 'none' && (
+        <script src="/assets/js/captcha.js" defer />
+      )}
     </>
   );
 }

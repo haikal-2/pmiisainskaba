@@ -1,5 +1,5 @@
 import Link from 'next/link';
-
+import Image from 'next/image';
 import { queryOne } from '@/server/db/pool';
 import config from '@/server/config';
 import AdminLogoutButton from '@/components/admin/AdminLogoutButton';
@@ -31,7 +31,7 @@ export default async function AdminDashboard({ username }: { username: string })
     <div className="space-y-8">
       <header className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-pmii-950 p-6 text-white shadow-card-hover sm:p-8">
         <div className="flex items-center gap-4">
-          <img src="/assets/img/logo-pmii.png" alt="" width="42" height="50" className="h-12 w-auto" />
+          <Image src="/assets/img/logo-32.png" alt="" width={48} height={48} className="h-12 w-12" />
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-kuning-300">PR PMII Saintek</p>
             <h1 className="mt-1 font-display text-2xl font-extrabold">Panel Pengurus</h1>

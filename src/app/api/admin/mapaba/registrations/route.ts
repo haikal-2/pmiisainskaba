@@ -1,5 +1,5 @@
-import { query } from '@/server/db/pool';
 import { requireAdmin } from '@/server/auth/admin';
+import { query } from '@/server/db/pool';
 import { paginationSchema } from '@/server/schemas';
 import { fail, ok, withNoStore } from '@/server/api/response';
 
@@ -24,8 +24,12 @@ export async function GET(request: Request): Promise<Response> {
     );
     const count = await query<{ count: string }>(
       `SELECT COUNT(*)::text AS count FROM mapaba_registration
-       WHERE $1::text IS NULL OR full_name ILIKE '%' || $1 || '%' OR nim ILIKE '%' || $1 || '%'`, [q || null],
+       WHERE $1::text IS NULL OR full_name ILIKE '%' || $1 || '%' OR nim ILIKE '%' || $1 || '%'`,
+      [q || null],
     );
+    // `no-store` + skema privat: data peserta tidak boleh masuk cache bersama.
     return ok({ items: result.rows, page, perPage, total: Number(count.rows[0]?.count ?? 0) }, 200, withNoStore());
-  } catch (error) { return fail(error, request); }
+  } catch (error) {
+    return fail(error, request, { operation: 'admin.mapaba.list' });
+  }
 }

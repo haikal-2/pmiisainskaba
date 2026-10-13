@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { notFound, redirect } from 'next/navigation';
 
 import config from '@/server/config';
@@ -20,7 +21,7 @@ return (
   <main className="admin-shell min-h-screen px-4 py-8 sm:px-6">
     <div className="mx-auto max-w-7xl">
       <header className="mb-8 flex-wrap items-center justify-between gap-4 rounded-3xl bg-pmii-950 p-5 text-white">
-        <Link href={`/${config.adminPath}`} className="flex items-center gap-3"><img src="/assets/img/logo-pmii.png" alt="" className="h-10 w-auto" /><span className="font-display font-bold">Panel Pengurus</span></Link>
+        <Link href={`/${config.adminPath}`} className="flex items-center gap-3"><Image src="/assets/img/logo-32.png" alt="" width={40} height={40} className="h-10 w-10" /><span className="font-display font-bold">Panel Pengurus</span></Link>
         <div className="flex items-center gap-3"><Link href="/" className="text-sm text-pmii-100 hover:text-white">Website publik ↗</Link><AdminLogoutButton /></div>
       </header>
       <AdminModuleView module={module as AdminModuleKey} />

@@ -1,5 +1,5 @@
 'use client';
-
+import Image from 'next/image';
 import { useState, type FormEvent } from 'react';
 
 export default function AdminLoginForm() {
@@ -33,7 +33,7 @@ export default function AdminLoginForm() {
   return (
     <section className="mx-auto max-w-md rounded-3xl border-slate-200 bg-white p-8 shadow-card sm:p-10">
       <div className="flex items-center gap-4">
-        <img src="/assets/img/logo-pmii.png" alt="Logo PMII" width="44" height="52" className="h-12 w-auto" />
+        <Image src="/assets/img/logo-32.png" alt="Logo PMII" width={48} height={48} className="h-12 w-12" />
         <div>
           <p className="font-display text-lg font-extrabold text-pmii-950">Panel Pengurus</p>
           <p className="text-xs text-slate-500">PR PMII Saintek · Akses terbatas</p>

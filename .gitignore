@@ -19,4 +19,11 @@ tsconfig.tsbuildinfo
 .vercel
 .pglite-data/
 test-artifacts/
+.local-uploads/
 .worktrees/
+.vscode/
+.agents/
+.claude/
+project_info__*.md
+skills-lock.json
+.local-uploads/

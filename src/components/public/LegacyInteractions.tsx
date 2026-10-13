@@ -113,13 +113,15 @@ function uploadFile(file: File, kind: 'pasFoto' | 'ktm', draft: { draftId: strin
     });
     xhr.addEventListener('load', () => {
       const response = JSON.parse(xhr.responseText || '{}') as {
-        data?: { url?: string };
+        // Server hanya mengembalikan referensi opaque (pathname kanonik), bukan URL.
+        data?: { reference?: string };
         error?: { message?: string };
       };
-      if (xhr.status >= 200 && xhr.status < 300 && response.data?.url) {
-        if (hidden) hidden.value = response.data.url;
+      const reference = response.data?.reference;
+      if (xhr.status >= 200 && xhr.status < 300 && reference) {
+        if (hidden) hidden.value = reference;
         if (preview) preview.innerHTML = `<div class="flex items-start gap-3 rounded-xl border-emerald-200 bg-emerald-50 p-3"><span class="text-sm font-semibold text-emerald-900">✓ Berhasil diunggah</span><span class="truncate text-xs text-emerald-800">${escapeHtml(file.name)}</span><button type="button" data-remove-upload class="text-xs font-semibold text-red-600 underline">Ganti</button></div>`;
-        resolve(response.data.url);
+        resolve(reference);
       } else {
         if (dropzone) dropzone.classList.remove('hidden');
         if (preview) preview.classList.add('hidden');
@@ -146,7 +148,10 @@ function setupUploaders(): void {
   const getDraft = () => {
     draftPromise ??= jsonRequest<{ data: { draftId: string; token: string } }>('/api/public/mapaba/uploads', {
       kind: 'pasFoto', fileName: 'draft', mimeType: 'image/jpeg', byteSize: 1,
-    }).then((payload) => payload.data);
+    }).then((payload) => payload.data).catch((error: unknown) => {
+      draftPromise = null;
+      throw error;
+    });
     return draftPromise;
   };
 
@@ -161,7 +166,15 @@ function setupUploaders(): void {
         const draft = await getDraft();
         await uploadFile(file, kind, draft, wrapper);
       } catch (error) {
-        if (error instanceof Error) console.error('Upload gagal:', error.name);
+        const message = error instanceof Error ? error.message : 'Unggahan gagal. Silakan coba lagi.';
+        const field = kind === 'pasFoto' ? 'pasFotoUrl' : 'ktmUrl';
+        const errorElement = wrapper.querySelector<HTMLElement>(`[data-error-for="${field}"]`);
+        if (errorElement) {
+          errorElement.textContent = message;
+          errorElement.classList.remove('hidden');
+        }
+        wrapper.querySelector<HTMLElement>('[data-uploader-preview]')?.classList.add('hidden');
+        dropzone?.classList.remove('hidden');
       }
     };
     input.addEventListener('change', () => void choose(input.files?.[0]));
@@ -173,6 +186,8 @@ function setupUploaders(): void {
       const target = kind === 'pasFoto' ? 'pasFotoUrl' : 'ktmUrl';
       const hidden = document.querySelector<HTMLInputElement>(`input[name="${target}"]`);
       if (hidden) hidden.value = '';
+      const error = wrapper.querySelector<HTMLElement>(`[data-error-for="${target}"]`);
+      if (error) { error.textContent = ''; error.classList.add('hidden'); }
       input.value = '';
       wrapper.querySelector<HTMLElement>('[data-uploader-preview]')?.classList.add('hidden');
       dropzone?.classList.remove('hidden');
@@ -368,15 +383,17 @@ function setupUI(): void {
 
   const toggle = document.querySelector<HTMLButtonElement>('[data-menu-toggle]');
   const panel = document.querySelector<HTMLElement>('[data-menu-panel]');
-  toggle?.addEventListener('click', () => {
-    const open = toggle.getAttribute('aria-expanded') !== 'true';
-    toggle.setAttribute('aria-expanded', String(open));
-    panel?.classList.toggle('hidden', !open);
-    const label = toggle.querySelector<HTMLElement>('.sr-only');
-    if (label) label.textContent = open ? 'Tutup menu navigasi' : 'Buka menu navigasi';
-    toggle.querySelector('[data-icon-open]')?.classList.toggle('hidden', open);
-    toggle.querySelector('[data-icon-close]')?.classList.toggle('hidden', !open);
-  });
+  if (toggle) {
+    toggle.onclick = () => {
+      const open = toggle.getAttribute('aria-expanded') !== 'true';
+      toggle.setAttribute('aria-expanded', String(open));
+      panel?.classList.toggle('hidden', !open);
+      const label = toggle.querySelector<HTMLElement>('.sr-only');
+      if (label) label.textContent = open ? 'Tutup menu navigasi' : 'Buka menu navigasi';
+      toggle.querySelector('[data-icon-open]')?.classList.toggle('hidden', open);
+      toggle.querySelector('[data-icon-close]')?.classList.toggle('hidden', !open);
+    };
+  }
   document.querySelectorAll<HTMLElement>('[data-dropdown]').forEach((dropdown) => {
     const trigger = dropdown.querySelector<HTMLButtonElement>('[data-dropdown-trigger]');
     const menu = dropdown.querySelector<HTMLElement>('[data-dropdown-menu]');

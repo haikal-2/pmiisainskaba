@@ -19,6 +19,7 @@ const sora = Sora({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.APP_URL || 'http://localhost:3000'),
   title: {
     default: 'PR PMII Sains dan Teknologi UIN Sunan Gunung Djati Cabang Kabupaten Bandung',
     template: '%s | PR PMII Saintek',
@@ -36,7 +37,10 @@ export const metadata: Metadata = {
   authors: [{ name: 'PR PMII Saintek UIN SGD Cabang Kabupaten Bandung' }],
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large' } },
   manifest: '/site.webmanifest',
-  icons: { icon: '/assets/img/logo-pmii.png', apple: '/assets/img/logo-pmii.png' },
+  icons: {
+    icon: [{ url: '/favicon.ico' }, { url: '/assets/img/logo-32.png', type: 'image/png', sizes: '32x32' }],
+    apple: '/assets/img/logo-180.png',
+  },
   openGraph: {
     type: 'website',
     locale: 'id_ID',
@@ -44,7 +48,11 @@ export const metadata: Metadata = {
     title: 'PR PMII Sains dan Teknologi UIN Sunan Gunung Djati Cabang Kabupaten Bandung',
     description:
       "Website resmi PR PMII Sains dan Teknologi UIN Sunan Gunung Djati Cabang Kabupaten Bandung. Taqwa, Intelektual, Profesional.",
-    images: [{ url: '/assets/img/logo-pmii.png', alt: 'Lambang PMII Saintek' }],
+    images: [{ url: '/assets/img/og-image.jpg', width: 1200, height: 630, alt: 'PR PMII Saintek UIN SGD' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: ['/assets/img/og-image.jpg'],
   },
 };
 
@@ -57,7 +65,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="id" className={`scroll-smooth ${plusJakarta.variable} ${sora.variable}`}>
-      <body>{children}</body>
+      <body>
+        <a href="#main-content" className="skip-link">Langsung ke konten utama</a>
+        {children}
+      </body>
     </html>
   );
 }

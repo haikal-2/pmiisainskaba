@@ -65,6 +65,8 @@ export const advocacyReportSchema = z.object({
     .transform((value) => (value && value.length > 0 ? value : null)),
   anonim: z.boolean().optional().default(false),
   persetujuan: z.literal(true, { message: 'Pernyataan kebenaran data wajib disetujui.' }),
+  // Token captcha diverifikasi terpisah di route; di sini hanya panjangnya yang dibatasi.
+  captchaToken: z.string().trim().max(4096).optional().nullable().default(null).transform((value) => (value && value.length > 0 ? value : null)),
 });
 
 export type AdvocacyReportInput = z.infer<typeof advocacyReportSchema>;
@@ -113,6 +115,8 @@ export const mapabaRegistrationSchema = z.object({
   ktmUrl: z.string().trim().min(1, 'KTM wajib diunggah.').max(1000),
   kesediaan: z.literal(true, { message: 'Kesediaan mengikuti seluruh rangkaian wajib disetujui.' }),
   persetujuanData: z.literal(true, { message: 'Persetujuan pengolahan data wajib disetujui.' }),
+  // Token captcha diverifikasi terpisah di route; di sini hanya panjangnya yang dibatasi.
+  captchaToken: z.string().trim().max(4096).optional().nullable().default(null).transform((value) => (value && value.length > 0 ? value : null)),
 });
 
 export type MapabaRegistrationInput = z.infer<typeof mapabaRegistrationSchema>;
@@ -136,6 +140,11 @@ export const mapabaEventSchema = z.object({
   timeZone: trimmed(64),
   faculty: trimmed(120),
   published: z.boolean(),
+});
+
+/** Permintaan admin untuk mengirim ulang satu item sinkronisasi Google Sheets. */
+export const outboxRequeueSchema = z.object({
+  id: z.number().int().positive(),
 });
 
 // ---------------------------------------------------------------------------
