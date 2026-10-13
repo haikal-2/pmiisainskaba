@@ -26,6 +26,15 @@ export function noContent(headers?: HeadersInit): Response {
   return new Response(null, { status: 204, headers: merged });
 }
 
+const CONNECTION_ERROR_CODES = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ETIMEDOUT',
+  'ENOTFOUND',
+  'EPIPE',
+  'EAI_AGAIN',
+]);
+
 export function fail(error: unknown, request?: Request, context?: FailContext): Response {
   const requestId = randomUUID();
   let appError: AppError;
@@ -49,8 +58,16 @@ export function fail(error: unknown, request?: Request, context?: FailContext): 
   } else {
     // Log hanya metadata aman (kode/constraint Postgres, nama error, komponen asal).
     // Jangan pernah log body, query, token, pathname berkas privat, atau data pribadi.
+    const classified = classifyError(error);
     logEvent('error', 'request.failed', buildLogFields({ requestId, request, operation, error }));
-    appError = new AppError('INTERNAL', 'Permintaan gagal diproses. Silakan coba lagi.');
+    // Kegagalan koneksi database (mis. ECONNREFUSED) adalah insiden dependency,
+    // bukan bug aplikasi: klien mendapat 503 agar dapat membedakannya dari 500.
+    const dependencyDown =
+      classified.component === 'database' &&
+      (CONNECTION_ERROR_CODES.has(classified.pgCode ?? '') || classified.errorName === 'AggregateError');
+    appError = dependencyDown
+      ? new AppError('DEPENDENCY_UNAVAILABLE', 'Layanan sedang tidak tersedia. Silakan coba lagi nanti.')
+      : new AppError('INTERNAL', 'Permintaan gagal diproses. Silakan coba lagi.');
   }
   const body: ApiFailure = {
     error: {

@@ -31,7 +31,12 @@ export async function POST(request: Request): Promise<Response> {
       blockSeconds: 60 * 60,
     });
 
-    const body = (await request.json()) as Record<string, unknown>;
+    let body: Record<string, unknown>;
+    try {
+      body = (await request.json()) as Record<string, unknown>;
+    } catch {
+      throw AppError.validation('Body permintaan bukan JSON yang valid.');
+    }
     const draftId = typeof body.draftId === 'string' ? body.draftId : '';
     const draftToken = typeof body.draftToken === 'string' ? body.draftToken : '';
     if (!draftId || !draftToken) {

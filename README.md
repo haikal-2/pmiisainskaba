@@ -27,7 +27,9 @@ Blob URL. `src/server/storage/reference.ts` is the single place that validates t
 
 `npm run test:db` and `npm run test:mapaba` use in-memory PGlite and never connect to `DATABASE_URL`: both run with `--env-file=tests/empty.env` so `.env.local` is not loaded.
 Builds and runtime commands require an explicit valid `DATABASE_URL`; production
-also requires `RATE_LIMIT_HASH_SALT`, and private uploads require `BLOB_READ_WRITE_TOKEN`.
+also requires `RATE_LIMIT_HASH_SALT` and `APP_URL` (canonical domain for
+sitemap/OG URLs), `CRON_SECRET` for the scheduled outbox worker (the cron
+endpoint fails closed without it), and `BLOB_READ_WRITE_TOKEN` for private uploads.
 
 ## Useful commands
 

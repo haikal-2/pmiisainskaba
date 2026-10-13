@@ -28,7 +28,13 @@ export async function POST(request: Request): Promise<Response> {
       windowSeconds: 60 * 60,
       blockSeconds: 15 * 60,
     });
-    const parsed = advocacyReportSchema.safeParse(await request.json());
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      throw AppError.validation('Body permintaan bukan JSON yang valid.');
+    }
+    const parsed = advocacyReportSchema.safeParse(body);
     if (!parsed.success) {
       throw AppError.validation('Beberapa kolom masih perlu diperbaiki.', flattenFieldErrors(parsed.error));
     }
