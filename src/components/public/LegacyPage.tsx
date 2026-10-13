@@ -38,19 +38,26 @@ function rewriteMarkup(markup: string, page: LegacyPageKey): string {
 
   if (page === 'mapaba') {
     html = html
+      // Frasa spesifik lebih dulu: penggantian tanggal generik di bawah
+      // mematahkan pola frasa bila dijalankan terbalik.
+      .replaceAll('Pendaftaran Dibuka 1 Oktober 2026', 'Pendaftaran Dibuka')
+      .replaceAll(
+        'akan dibuka pada 1 Oktober 2026 dan ditutup pada 28 Oktober 2026',
+        'telah dibuka dan akan ditutup pada 3 November 2026',
+      )
+      .replaceAll('Pendaftaran dibuka dalam', 'Pendaftaran ditutup dalam')
+      .replaceAll('Pendaftaran Belum Dibuka', 'Pendaftaran Dibuka')
+      .replaceAll('31 Okt – 2 Nov', '6–8 November 2026')
+      .replaceAll('31 Okt - 2 Nov', '6–8 November 2026')
       .replaceAll('data-countdown="2026-10-01T00:00:00+07:00"', 'data-countdown="2026-11-03T23:59:59+07:00"')
       .replaceAll('data-registration-opens="2026-10-01T00:00:00+07:00"', 'data-registration-opens="2026-01-01T00:00:00+07:00"')
       .replaceAll('data-registration-closes="2026-10-28T23:59:59+07:00"', 'data-registration-closes="2026-11-03T23:59:59+07:00"')
       .replaceAll('2026-10-28T23:59:59+07:00', '2026-11-03T23:59:59+07:00')
       .replaceAll('2026-11-01T23:59:59+07:00', '2026-11-03T23:59:59+07:00')
-      .replaceAll('31 Okt – 2 Nov', '6–8 November 2026')
-      .replaceAll('31 Okt - 2 Nov', '6–8 November 2026')
-      .replaceAll('1 Oktober 2026', 'Selalu dibuka')
       .replaceAll('28 Oktober 2026', '3 November 2026')
       .replaceAll('1 November 2026', '3 November 2026')
-      .replaceAll('Pendaftaran Dibuka 1 Oktober 2026', 'Pendaftaran Dibuka')
-      .replaceAll('Pendaftaran dibuka dalam', 'Pendaftaran ditutup dalam')
-      .replaceAll('Pendaftaran Belum Dibuka', 'Pendaftaran Dibuka')
+      // Label atribut data-registration-opens-label dan sisa teks umum.
+      .replaceAll('1 Oktober 2026', 'Dibuka')
       .replaceAll('150 peserta', '100 peserta')
       .replaceAll('200 peserta', '100 peserta');
 
