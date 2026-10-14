@@ -148,9 +148,20 @@ async function seedMapaba(database: DbExecutor, options: MapabaSeedOptions): Pro
   await database.query(
     `INSERT INTO mapaba_event (
       id, title, edition, dates_label, location_label, quota, contribution_label,
-      opens_at, closes_at, time_zone, faculty
-    ) VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-    ON CONFLICT (id) DO NOTHING`,
+      opens_at, closes_at, time_zone, faculty, published
+    ) VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    ON CONFLICT (id) DO UPDATE SET
+      title = EXCLUDED.title,
+      edition = EXCLUDED.edition,
+      dates_label = EXCLUDED.dates_label,
+      location_label = EXCLUDED.location_label,
+      quota = EXCLUDED.quota,
+      contribution_label = EXCLUDED.contribution_label,
+      opens_at = EXCLUDED.opens_at,
+      closes_at = EXCLUDED.closes_at,
+      time_zone = EXCLUDED.time_zone,
+      faculty = EXCLUDED.faculty,
+      published = EXCLUDED.published`,
     [
       'MAPABA Raya 2026',
       'MAPABA SAINTEK Ke-XVII',
@@ -162,6 +173,7 @@ async function seedMapaba(database: DbExecutor, options: MapabaSeedOptions): Pro
       options.closesAt,
       options.timeZone,
       options.faculty,
+      true,   // published
     ],
   );
 
