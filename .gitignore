@@ -27,3 +27,5 @@ test-artifacts/
 project_info__*.md
 skills-lock.json
 .local-uploads/
+
+temp/
